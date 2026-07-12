@@ -84,10 +84,13 @@ class Tool(BaseModel):
     def call(self, *args, **kwargs) -> Any:
         try:
             return self.callable(*args, **kwargs)
-        except BaseException as e:  # noqa: BLE001
-            # Skip the current stack frame to make sure our traceback starts inside of self.callable
-            tb = e.__traceback__.tb_next
-            assert tb is not None  # must exist
+        except Exception as e:
+            # Skip the current stack frame to make sure our traceback starts inside of
+            # self.callable, if it got far enough to have its own frame. When the call
+            # itself fails before entering self.callable (e.g. self.callable isn't
+            # actually callable), there's no inner frame to skip, so fall back to the
+            # exception's own traceback instead of asserting on a None tb_next.
+            tb = e.__traceback__.tb_next or e.__traceback__
             if self.exc_formatter is None:
                 return "".join(traceback.format_exception(type(e), e, tb))
             return self.exc_formatter(type(e), e, tb)
