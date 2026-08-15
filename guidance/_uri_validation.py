@@ -115,6 +115,14 @@ def _check_ip_address(
     addr: ipaddress.IPv4Address | ipaddress.IPv6Address, original_url: str, allow_private: bool = False
 ) -> None:
     """Raise if the IP address is a cloud metadata endpoint, private, loopback, or link-local."""
+    # `::ffff:168.63.129.16` and `168.63.129.16` are the same destination, so unwrap before the
+    # membership test. This matters most for the two addresses the list above exists for: both are
+    # publicly routable, so the range checks below never see them and equality against the list is
+    # the only thing in the way. The link-local entries survive the wrapper on their own because
+    # Python reports an IPv4-mapped address as link-local, which is what hid this.
+    if isinstance(addr, ipaddress.IPv6Address) and addr.ipv4_mapped is not None:
+        addr = addr.ipv4_mapped
+
     if addr in _CLOUD_METADATA_ADDRESSES:
         raise URIValidationError(f"URI resolves to a cloud metadata endpoint ({addr}): {original_url}")
     if allow_private:

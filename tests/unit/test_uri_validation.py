@@ -179,3 +179,21 @@ class TestCloudMetadataEndpoints:
             pytest.raises(URIValidationError, match="cloud metadata endpoint"),
         ):
             validate_uri("https://metadata.example.com/x")
+
+    @pytest.mark.parametrize(
+        "ip",
+        [
+            "168.63.129.16",  # Azure WireServer, publicly routable
+            "100.100.100.200",  # Alibaba Cloud, inside 100.64.0.0/10 which Python calls public
+        ],
+    )
+    def test_metadata_endpoint_not_reachable_through_ipv4_mapped_ipv6(self, ip):
+        """Wrapping the address in `::ffff:` must not walk past the list.
+
+        These are the two entries that motivated the list: both are publicly routable, so the
+        private/loopback/link-local/reserved checks never catch them and the membership test is
+        the only guard. The link-local entries hide this, because Python reports an IPv4-mapped
+        link-local address as link-local and blocks it on the range check regardless.
+        """
+        with pytest.raises(URIValidationError, match="cloud metadata endpoint"):
+            validate_uri(f"https://[::ffff:{ip}]/latest/meta-data/")
